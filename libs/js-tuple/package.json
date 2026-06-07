@@ -1,6 +1,6 @@
 {
   "name": "js-tuple",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "High performance tuples for Map/Set indexing, NestedMap/NestedSet, and trees.",
   "main": "dist/index.js",
   "exports": {

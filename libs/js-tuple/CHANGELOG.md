@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.0](https://github.com/codibre/js-utils/compare/js-tuple@0.6.0...${npm.name}@0.7.0) (2026-06-07)
+
+### Features
+
+* improve README with caching/grouping examples and getOrSet docs, add reusable skill definition ([eda907e](https://github.com/codibre/js-utils/commit/eda907e9d420d81432c2b70c12d669e90e5c3e5d))
+
 ## [0.6.0](https://github.com/codibre/js-utils/compare/js-tuple@0.5.0...${npm.name}@0.6.0) (2025-09-10)
 
 ### Features
