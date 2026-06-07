@@ -11,6 +11,7 @@ permissions:
   issues: write
   packages: write
   actions: write
+  id-token: write
 
 jobs:
   build-and-test:
@@ -26,10 +27,8 @@ jobs:
       - name: Build and Test
         uses: ./.github/actions/build-and-test
         with:
-            node-auth-token: ${{ secrets.NPM_TOKEN }}
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            cc-test-reporter-id: ${{ secrets.CC_TEST_REPORTER_ID }}
-            qlty-coverage-token: ${{ secrets.QLTY_COVERAGE_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cc-test-reporter-id: ${{ secrets.CC_TEST_REPORTER_ID }}
 
   check-releases:
     runs-on: ubuntu-latest
@@ -107,6 +106,11 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+      NPM_TOKEN: ${{secrets.NPM_TOKEN}}
+      HUSKY: 0
+      CI: true
     needs: [check-releases, build-and-test]
     if: needs.check-releases.outputs.has-releases == 'true'
 
@@ -137,23 +141,23 @@ jobs:
           echo "Using pnpm version: $PNPM_VERSION"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: ${{ steps.pnpm-version.outputs.version }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: "lts/*"
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Build Libs
         run: |
           pnpm i
           pnpm run build
+        env:
+          HUSKY: 0
 
       - name: Get dependency cache key
         id: cache-key
@@ -189,28 +193,36 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          HUSKY: 0
 
       - name: Install release-it for CI
-        run: pnpm install -g release-it @release-it/conventional-changelog
-
-      - name: Configure npm authentication
         run: |
-          # Create .npmrc for npm authentication
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          npm install -g release-it@20.2.0 @release-it/conventional-changelog@11.0.1
+
+      - name: Get OIDC Token
+        id: oidc
+        run: |
+          # Request OIDC token from GitHub
+          OIDC_TOKEN=$(curl -sL "${ACTIONS_ID_TOKEN_REQUEST_URL}?audience=https://registry.npmjs.org" \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" | jq -r '.value')
+          echo "oidc-token=${OIDC_TOKEN}" >> $GITHUB_OUTPUT
+
+      - name: Configure npm authentication for OIDC
+        run: |
+          # Configure npm to use OIDC token
+          echo "//registry.npmjs.org/:_authToken=${OIDC_TOKEN}" > ~/.npmrc
           echo "registry=https://registry.npmjs.org/" >> ~/.npmrc
           echo "always-auth=true" >> ~/.npmrc
 
           # Verify authentication
           echo "Testing npm authentication..."
-          npm whoami || echo "npm whoami failed - this might be expected if the token has limited permissions"
+          npm whoami || echo "npm whoami failed"
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          OIDC_TOKEN: ${{ steps.oidc.outputs.oidc-token }}
 
       - name: Release ${{ matrix.library }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           echo "📦 Processing ${{ matrix.library }}..."
 
@@ -265,4 +277,3 @@ jobs:
             git tag -l | tail -10
             exit 1
           fi
-

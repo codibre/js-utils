@@ -111,6 +111,29 @@ Gets an object reference for any value, enabling it to be used as a WeakMap key.
 **Returns:**
 - Object that can be used as a WeakMap key
 
+### `getOrSet(key: K, factory: () => V): V`
+
+Retrieves the value for a key if it exists; otherwise, creates it using the provided factory function and stores it. Eliminates manual `if (!cache.get(key)) { cache.set(key, ...) }` boilerplate. Ideal for caching expensive computations or grouping items by composite keys.
+
+**Parameters:**
+- `key`: The array key to look up (e.g., `[userId, 'profile']`)
+- `factory`: A function that returns the default value if the key is missing
+
+**Returns:**
+- The existing value or the newly created one
+
+**Example:**
+```typescript
+const cache = new NestedMap<[string, string], UserData>();
+
+// Instead of:
+let user = cache.get(['user', '123']);
+if (!user) { user = fetchUser('123'); cache.set(['user', '123'], user); }
+
+// Use getOrSet:
+const user = cache.getOrSet(['user', '123'], () => fetchUser('123'));
+```
+
 ## Usage Examples
 
 ### Map Keys
@@ -177,6 +200,68 @@ coordinates.add(tuple([0, 0])); // Won't add duplicate
 
 console.log(coordinates.size); // 2
 console.log(coordinates.has(tuple([0, 0]))); // true
+```
+
+## Caching & Grouping Patterns
+
+`js-tuple` shines when you need to cache results or group items by composite keys (multiple attributes). `NestedMap.getOrSet()` eliminates the boilerplate of manual initialization.
+
+### Caching Expensive Computations
+
+Avoid re-computing values for the same input combination:
+
+```typescript
+import { NestedMap } from 'js-tuple';
+
+const expensiveCache = new NestedMap<[string, number], string>();
+
+function computeResult(type: string, id: number): string {
+  // Simulate heavy computation
+  return `Processed ${type}#${id}`;
+}
+
+// Before: manual boilerplate
+let result1 = expensiveCache.get(['user', 123]);
+if (!result1) {
+  result1 = computeResult('user', 123);
+  expensiveCache.set(['user', 123], result1);
+}
+
+// After: clean one-liner
+const result2 = expensiveCache.getOrSet(['user', 123], () => computeResult('user', 123));
+```
+
+### Grouping / Bucketing by Composite Key
+
+Group items without string concatenation or manual `if (!group) { group = []; map.set(key, group); }` boilerplate:
+
+```typescript
+import { NestedMap } from 'js-tuple';
+
+interface Particle {
+  color: string;
+  alpha: number;
+  draw(): void;
+}
+
+const groups = new NestedMap<[string, number], Array<() => void>>();
+
+function addParticle(particle: Particle): void {
+  // Group by [color, alpha] — no string concat needed!
+  const group = groups.getOrSet([particle.color, particle.alpha], () => []);
+  group.push(particle.draw);
+}
+
+// Usage in a render loop:
+for (const p of particles) {
+  addParticle(p);
+}
+
+groups.forEach((drawFns, [color, alpha]) => {
+  ctx.fillStyle = color;
+  ctx.globalAlpha = alpha;
+  drawFns.forEach(fn => fn());
+});
 ```
 
 ## Mixed Types Support
