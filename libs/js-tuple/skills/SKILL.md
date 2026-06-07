@@ -1,6 +1,6 @@
 ---
 name: js-tuple
-description: "High-performance nested Maps & Sets for JS — replaces string-concat composite keys and manual getOrSet boilerplate with NestedMap.getOrSet() for caching, grouping, and bucketing"
+description: "High-performance nested Maps & Sets for JS — value-based array keys with NestedMap/NestedSet and getOrSet to eliminate string-concat keys and manual caching/grouping boilerplate"
 version: 1.0.0
 author: farenheith
 license: MIT
@@ -25,7 +25,7 @@ if (!group) { group = []; map.set(key, group); } // boilerplate
 
 **Anti-pattern 2 — Manual `getOrSet` boilerplate:**
 ```ts
-const key = [a, b];
+const key = [userId]; // or [a, b], or any array-wrapped key
 let value = cache.get(key);
 if (!value) { value = compute(); cache.set(key, value); }
 ```
@@ -84,19 +84,17 @@ console.log(set.has([42, 'fish'])); // true ✅
 ## Best Practice
 > Use `NestedMap`/`NestedSet` by default. Only use `tuple()` + native `Map/Set` when you need explicit control or API compatibility.
 
-## When to Use This Library (Composite Keys Only)
-This library is **only** useful when your lookup requires **2+ dimensions of identity**. If a single key suffices, stick to native `Map`/`Set`.
+## When to Use This Library
 
-### ✅ Composite Key Scenarios (Use js-tuple)
-- **Grid/Spatial Lookup:** `[tileX, tileY] → Entity[]` — Need both coordinates to identify a cell.
-- **Pair/Relationship Cache:** `[entityA, entityB] → CollisionResult` — Need the specific pair, not just one ID.
-- **Compound Deduplication:** `[eventType, eventId] → boolean` — Type alone isn't unique; need event ID too.
-- **Multi-Dimensional State:** `[roomId, userId] → PresenceData` — Who is in which room at a given time.
-- **Grouping/Bucketing by Composite Key:** `[fillStyle, alpha] → DrawFn[]` — Group items by multiple attributes without string concatenation or manual `if (!group) { group = []; map.set(key, group); }` boilerplate. Use `getOrSet([a, b], () => [])`.
+`js-tuple` is useful whenever you need value-based equality for array keys — whether that's a single logical key wrapped in an array, or multiple dimensions of identity. `NestedMap.getOrSet()` eliminates boilerplate regardless of key arity.
 
-### ❌ Simple Key Scenarios (Skip js-tuple)
-- **Single Entity Lookup:** `Map<EntityId, Component>` — One ID identifies the component uniquely.
-- **Type/Category Sets:** `Set<EventType>` — Just checking if a type exists.
-- **Timestamp Indexing:** `Map<Timestamp, Data>` — Single point in time is sufficient.
+### ✅ Good Fit (Use js-tuple)
+- **Composite Key Lookup:** `[tileX, tileY] → Entity[]` — Multiple attributes identify the value.
+- **Pair/Relationship Cache:** `[entityA, entityB] → CollisionResult` — Need the specific pair.
+- **Compound Deduplication:** `[eventType, eventId] → boolean` — Type alone isn't unique.
+- **Multi-Dimensional State:** `[roomId, userId] → PresenceData`.
+- **Grouping/Bucketing by Composite Key:** `[fillStyle, alpha] → DrawFn[]` — Group items without string concatenation or manual `if (!group) { group = []; map.set(key, group); }` boilerplate. Use `getOrSet([a, b], () => [])`.
+- **Simple Key with getOrSet:** Even a single-element array key `[userId]` benefits from `getOrSet()`'s clean API — no more manual `if (!cache.get(key)) { cache.set(key, ...) }` boilerplate.
 
-> Rule of thumb: If your Map/Set question has more than one variable (`"What's the value for X and Y?"`), use js-tuple. If it's just `"What's the value for X?"`, native collections are fine.
+### ❌ Skip js-tuple (Use Native Collections)
+- **Primitive keys only with no getOrSet need:** If you just need `Map<string, Value>` or `Set<number>` and don't want the array wrapper overhead, native collections are simpler.
